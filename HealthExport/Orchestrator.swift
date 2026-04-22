@@ -26,10 +26,9 @@ final class Orchestrator: ObservableObject {
         do {
             try await healthStore.requestAuthorization()
             let snapshot = try await healthStore.snapshot(for: day)
-            let result = try exporter.write(snapshot)
-            lastFileURL = result.url
-            let storage = result.isICloud ? "iCloud" : "local fallback"
-            lastRunStatus = "Success (\(storage)): \(result.url.lastPathComponent)"
+            let url = try exporter.write(snapshot)
+            lastFileURL = url
+            lastRunStatus = "Success: \(url.lastPathComponent)"
         } catch {
             lastRunStatus = "Failed: \(error.localizedDescription)"
         }
