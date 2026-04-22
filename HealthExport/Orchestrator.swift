@@ -11,31 +11,25 @@ final class Orchestrator: ObservableObject {
     @Published var isRunning = false
 
     func requestAuthAndExportYesterday() async {
-        isRunning = true
-        defer { isRunning = false }
-
-        do {
-            try await healthStore.requestAuthorization()
-            let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date())!
-            let snapshot = try await healthStore.snapshot(for: yesterday)
-            let url = try exporter.write(snapshot)
-            lastFileURL = url
-            lastRunStatus = "Success: wrote \(url.lastPathComponent)"
-        } catch {
-            lastRunStatus = "Failed: \(error.localizedDescription)"
-        }
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date())!
+        await run(for: yesterday)
     }
 
     func requestAuthAndExportToday() async {
+        await run(for: Date())
+    }
+
+    private func run(for day: Date) async {
         isRunning = true
         defer { isRunning = false }
 
         do {
             try await healthStore.requestAuthorization()
-            let snapshot = try await healthStore.snapshot(for: Date())
-            let url = try exporter.write(snapshot)
-            lastFileURL = url
-            lastRunStatus = "Success: wrote \(url.lastPathComponent)"
+            let snapshot = try await healthStore.snapshot(for: day)
+            let result = try exporter.write(snapshot)
+            lastFileURL = result.url
+            let storage = result.isICloud ? "iCloud" : "local fallback"
+            lastRunStatus = "Success (\(storage)): \(result.url.lastPathComponent)"
         } catch {
             lastRunStatus = "Failed: \(error.localizedDescription)"
         }
