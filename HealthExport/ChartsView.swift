@@ -1,5 +1,6 @@
 import SwiftUI
 import Charts
+import Combine
 
 struct ChartPoint: Identifiable {
     let id = UUID()

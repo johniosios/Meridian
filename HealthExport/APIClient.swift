@@ -10,7 +10,7 @@ final class APIClient {
 
         var errorDescription: String? {
             switch self {
-            case .missingAPIKey:   return "未配置 API Key（去"设置 → AI 分析"填）"
+            case .missingAPIKey:   return "未配置 API Key（去设置 → AI 分析填写）"
             case .invalidURL:      return "Base URL 无效"
             case .invalidResponse: return "API 响应格式错误"
             case .apiError(let m): return m
