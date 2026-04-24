@@ -39,11 +39,9 @@ final class HealthStore {
             HKObjectType.workoutType()
         ]
 
-        // iOS 16+ wrist temperature
         if let wristTemp = HKQuantityType.quantityType(forIdentifier: .appleSleepingWristTemperature) {
             readTypes.insert(wristTemp)
         }
-        // iOS 17+ time in daylight
         if let daylight = HKQuantityType.quantityType(forIdentifier: .timeInDaylight) {
             readTypes.insert(daylight)
         }
@@ -90,30 +88,29 @@ final class HealthStore {
 
     // MARK: - Category queries
 
-    private func querySleep(predicate: NSPredicate) async throws -> HealthDaySnapshot.Sleep? {
+    private func querySleep(predicate: NSPredicate) async throws -> HealthDaySnapshot.Sleep {
         let type = HKObjectType.categoryType(forIdentifier: .sleepAnalysis)!
         let samples = try await fetchCategorySamples(type: type, predicate: predicate)
-        guard !samples.isEmpty else { return nil }
+        guard !samples.isEmpty else {
+            return .init(inBedMinutes: nil, asleepMinutes: nil, asleepDeepMinutes: nil,
+                         asleepCoreMinutes: nil, asleepRemMinutes: nil, awakeMinutes: nil)
+        }
 
-        var inBed = 0.0
-        var asleep = 0.0
-        var deep = 0.0
-        var core = 0.0
-        var rem = 0.0
-        var awake = 0.0
+        var inBed = 0.0, asleep = 0.0, deep = 0.0, core = 0.0, rem = 0.0, awake = 0.0
+        var hasInBed = false, hasAsleep = false
         for sample in samples {
             let duration = sample.endDate.timeIntervalSince(sample.startDate) / 60.0
             switch sample.value {
             case HKCategoryValueSleepAnalysis.inBed.rawValue:
-                inBed += duration
+                inBed += duration; hasInBed = true
             case HKCategoryValueSleepAnalysis.asleepDeep.rawValue:
-                deep += duration; asleep += duration
+                deep += duration; asleep += duration; hasAsleep = true
             case HKCategoryValueSleepAnalysis.asleepCore.rawValue:
-                core += duration; asleep += duration
+                core += duration; asleep += duration; hasAsleep = true
             case HKCategoryValueSleepAnalysis.asleepREM.rawValue:
-                rem += duration; asleep += duration
+                rem += duration; asleep += duration; hasAsleep = true
             case HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue:
-                asleep += duration
+                asleep += duration; hasAsleep = true
             case HKCategoryValueSleepAnalysis.awake.rawValue:
                 awake += duration
             default:
@@ -121,8 +118,8 @@ final class HealthStore {
             }
         }
         return .init(
-            inBedMinutes: Int(inBed),
-            asleepMinutes: Int(asleep),
+            inBedMinutes: hasInBed ? Int(inBed) : nil,
+            asleepMinutes: hasAsleep ? Int(asleep) : nil,
             asleepDeepMinutes: deep > 0 ? Int(deep) : nil,
             asleepCoreMinutes: core > 0 ? Int(core) : nil,
             asleepRemMinutes: rem > 0 ? Int(rem) : nil,
@@ -130,7 +127,7 @@ final class HealthStore {
         )
     }
 
-    private func queryHeart(predicate: NSPredicate) async throws -> HealthDaySnapshot.Heart? {
+    private func queryHeart(predicate: NSPredicate) async throws -> HealthDaySnapshot.Heart {
         let hrType = HKQuantityType.quantityType(forIdentifier: .heartRate)!
         let restingType = HKQuantityType.quantityType(forIdentifier: .restingHeartRate)!
         let walkingType = HKQuantityType.quantityType(forIdentifier: .walkingHeartRateAverage)!
@@ -145,8 +142,6 @@ final class HealthStore {
         let hrvMs = try await fetchLatestQuantity(type: hrvType, predicate: predicate)?
             .doubleValue(for: .secondUnit(with: .milli))
 
-        guard !values.isEmpty || resting != nil || hrvMs != nil || walking != nil else { return nil }
-
         return .init(
             restingBpm: resting.map { Int($0) },
             maxBpm: values.max().map { Int($0) },
@@ -154,11 +149,11 @@ final class HealthStore {
             avgBpm: values.isEmpty ? nil : Int(values.reduce(0, +) / Double(values.count)),
             hrvSdnnMs: hrvMs,
             walkingAvgBpm: walking.map { Int($0) },
-            samplesCount: values.count
+            samplesCount: values.isEmpty ? nil : values.count
         )
     }
 
-    private func queryActivity(predicate: NSPredicate) async throws -> HealthDaySnapshot.Activity? {
+    private func queryActivity(predicate: NSPredicate) async throws -> HealthDaySnapshot.Activity {
         let steps = try await sumQuantity(.stepCount, unit: .count(), predicate: predicate)
         let dist = try await sumQuantity(.distanceWalkingRunning, unit: .meter(), predicate: predicate)
         let active = try await sumQuantity(.activeEnergyBurned, unit: .kilocalorie(), predicate: predicate)
@@ -166,9 +161,6 @@ final class HealthStore {
         let exercise = try await sumQuantity(.appleExerciseTime, unit: .minute(), predicate: predicate)
         let stand = try await sumQuantity(.appleStandTime, unit: .minute(), predicate: predicate)
         let flights = try await sumQuantity(.flightsClimbed, unit: .count(), predicate: predicate)
-
-        if steps == nil && dist == nil && active == nil && basal == nil &&
-           exercise == nil && stand == nil && flights == nil { return nil }
 
         return .init(
             steps: steps.map { Int($0) },
@@ -181,7 +173,7 @@ final class HealthStore {
         )
     }
 
-    private func queryBody(predicate: NSPredicate) async throws -> HealthDaySnapshot.Body? {
+    private func queryBody(predicate: NSPredicate) async throws -> HealthDaySnapshot.Body {
         let weightType = HKQuantityType.quantityType(forIdentifier: .bodyMass)!
         let fatType = HKQuantityType.quantityType(forIdentifier: .bodyFatPercentage)!
 
@@ -196,11 +188,10 @@ final class HealthStore {
                 .doubleValue(for: .degreeCelsius())
         }
 
-        if weight == nil && fat == nil && wristTemp == nil { return nil }
         return .init(weightKg: weight, bodyFatPct: fat.map { $0 * 100 }, wristTempC: wristTemp)
     }
 
-    private func queryRespiratory(predicate: NSPredicate) async throws -> HealthDaySnapshot.Respiratory? {
+    private func queryRespiratory(predicate: NSPredicate) async throws -> HealthDaySnapshot.Respiratory {
         let spo2Type = HKQuantityType.quantityType(forIdentifier: .oxygenSaturation)!
         let respRateType = HKQuantityType.quantityType(forIdentifier: .respiratoryRate)!
         let vo2Type = HKQuantityType.quantityType(forIdentifier: .vo2Max)!
@@ -216,17 +207,15 @@ final class HealthStore {
         let vo2 = try await fetchLatestQuantity(type: vo2Type, predicate: predicate)?
             .doubleValue(for: HKUnit(from: "ml/(kg*min)"))
 
-        if spo2Avg == nil && respAvg == nil && vo2 == nil && spo2Values.isEmpty { return nil }
-
         return .init(
             bloodOxygenPctAvg: spo2Avg,
-            bloodOxygenSamplesCount: spo2Values.count,
+            bloodOxygenSamplesCount: spo2Values.isEmpty ? nil : spo2Values.count,
             respiratoryRateAvg: respAvg,
             vo2Max: vo2
         )
     }
 
-    private func queryAudio(predicate: NSPredicate) async throws -> HealthDaySnapshot.Audio? {
+    private func queryAudio(predicate: NSPredicate) async throws -> HealthDaySnapshot.Audio {
         let envType = HKQuantityType.quantityType(forIdentifier: .environmentalAudioExposure)!
         let hpType = HKQuantityType.quantityType(forIdentifier: .headphoneAudioExposure)!
         let dbUnit = HKUnit.decibelAWeightedSoundPressureLevel()
@@ -239,23 +228,25 @@ final class HealthStore {
         let hpValues = hpSamples.map { $0.quantity.doubleValue(for: dbUnit) }
         let hpAvg: Double? = hpValues.isEmpty ? nil : (hpValues.reduce(0, +) / Double(hpValues.count))
 
-        if envAvg == nil && hpAvg == nil { return nil }
         return .init(envSoundAvgDb: envAvg, envSoundMaxDb: envValues.max(), headphoneAvgDb: hpAvg)
     }
 
-    private func queryMindful(predicate: NSPredicate) async throws -> HealthDaySnapshot.Mindful? {
+    private func queryMindful(predicate: NSPredicate) async throws -> HealthDaySnapshot.Mindful {
         let type = HKObjectType.categoryType(forIdentifier: .mindfulSession)!
         let samples = try await fetchCategorySamples(type: type, predicate: predicate)
-        guard !samples.isEmpty else { return nil }
+        guard !samples.isEmpty else {
+            return .init(minutes: nil, sessionsCount: nil)
+        }
         let total = samples.reduce(0.0) { $0 + $1.endDate.timeIntervalSince($1.startDate) / 60.0 }
         return .init(minutes: Int(total), sessionsCount: samples.count)
     }
 
-    private func queryDaylight(predicate: NSPredicate) async throws -> HealthDaySnapshot.Daylight? {
-        guard HKQuantityType.quantityType(forIdentifier: .timeInDaylight) != nil else { return nil }
+    private func queryDaylight(predicate: NSPredicate) async throws -> HealthDaySnapshot.Daylight {
+        guard HKQuantityType.quantityType(forIdentifier: .timeInDaylight) != nil else {
+            return .init(minutes: nil)
+        }
         let minutes = try await sumQuantity(.timeInDaylight, unit: .minute(), predicate: predicate)
-        guard let m = minutes else { return nil }
-        return .init(minutes: Int(m))
+        return .init(minutes: minutes.map { Int($0) })
     }
 
     private func queryWorkouts(predicate: NSPredicate) async throws -> [HealthDaySnapshot.Workout] {
