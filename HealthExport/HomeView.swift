@@ -159,18 +159,33 @@ struct HomeView: View {
     private var alertsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("提醒")
+                Text("AI 提醒")
                     .font(.caption).foregroundStyle(.secondary).textCase(.uppercase)
                 Spacer()
-                Text(home.alerts.isEmpty ? "无异常" : "\(home.alerts.count) 项")
-                    .font(.caption).foregroundStyle(.secondary)
+                if insightGen.generatedAt != nil {
+                    Text(insightGen.alerts.isEmpty ? "无" : "\(insightGen.alerts.count) 项")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
-            if home.alerts.isEmpty {
+            if insightGen.generatedAt == nil {
+                HStack(alignment: .top, spacing: 10) {
+                    Circle().fill(Color.gray).frame(width: 10, height: 10).padding(.top, 6)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("还没有生成提醒").font(.subheadline).bold()
+                        Text("点顶部「生成洞察」，AI 会分析你的数据并返回 1-5 条具体提醒")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+                .padding(12)
+                .background(Color(.systemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            } else if insightGen.alerts.isEmpty {
                 HStack(alignment: .top, spacing: 10) {
                     Circle().fill(Color.green).frame(width: 10, height: 10).padding(.top, 6)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("今天各项指标正常").font(.subheadline).bold()
-                        Text("睡眠 / 心率 / 活动 / VO2Max 均未触发警示规则")
+                        Text("AI 判断各项正常").font(.subheadline).bold()
+                        Text("最近数据未触发任何警示")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
@@ -179,7 +194,7 @@ struct HomeView: View {
                 .background(Color(.systemBackground))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             } else {
-                ForEach(home.alerts) { alert in
+                ForEach(insightGen.alerts) { alert in
                     alertRow(alert)
                 }
             }
