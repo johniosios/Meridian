@@ -4,10 +4,13 @@ import Charts
 struct HomeView: View {
     @EnvironmentObject private var apiConfig: APIConfig
     @EnvironmentObject private var notif: NotificationManager
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var insightGen = InsightGenerator()
     @StateObject private var home = HomeDataLoader()
     @State private var windowDays: Int = 7
-    @State private var autoGenTriggered = false
+
+    /// 冷却时间：两次自动生成至少间隔多久（防快速切前后台烧 token）
+    private let autoRegenCooldown: TimeInterval = 30 * 60
 
     var body: some View {
         NavigationStack {
@@ -36,16 +39,21 @@ struct HomeView: View {
                 }
             }
             .task {
-                await home.load(days: windowDays)
-                await autoGenerateIfNeeded()
+                await loadAndAutoGenerate()
             }
             .onChange(of: windowDays) { _, new in
                 Task { await home.load(days: new) }
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                if newPhase == .active {
+                    Task { await loadAndAutoGenerate() }
+                }
             }
             .refreshable {
                 await home.load(days: windowDays)
                 if apiConfig.isConfigured {
                     await insightGen.generate(with: apiConfig, days: windowDays)
+                    pushLatestInsightToNotif()
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: .dailyNotificationTapped)) { _ in
@@ -53,6 +61,7 @@ struct HomeView: View {
                     await home.load(days: windowDays)
                     if apiConfig.isConfigured {
                         await insightGen.generate(with: apiConfig, days: windowDays)
+                        pushLatestInsightToNotif()
                     }
                 }
             }
@@ -346,23 +355,27 @@ struct HomeView: View {
 
     // MARK: - Auto generate + push updated notif body
 
-    private func autoGenerateIfNeeded() async {
-        guard !autoGenTriggered, apiConfig.isConfigured else { return }
-        let alreadyToday = insightGen.generatedAt.map {
-            Calendar.current.isDateInToday($0)
-        } ?? false
-        guard !alreadyToday else { return }
-
-        autoGenTriggered = true
+    /// Refreshes home metrics on every entry; regenerates AI if configured and cooldown elapsed.
+    private func loadAndAutoGenerate() async {
+        await home.load(days: windowDays)
+        guard apiConfig.isConfigured, shouldAutoRegenerate() else { return }
         await insightGen.generate(with: apiConfig, days: windowDays)
-
-        // Feed fresh insight into the daily scheduled notification body.
-        if notif.dailyEnabled, let summary = summaryForNotif() {
-            notif.updateDailyBody(summary)
-        }
+        pushLatestInsightToNotif()
     }
 
-    /// Extract a short body (first non-heading paragraph, up to 140 chars) for notification.
+    /// True if never generated, or last gen was longer than cooldown ago.
+    private func shouldAutoRegenerate() -> Bool {
+        guard let last = insightGen.generatedAt else { return true }
+        return Date().timeIntervalSince(last) > autoRegenCooldown
+    }
+
+    /// Updates the daily notification body with the latest AI summary.
+    private func pushLatestInsightToNotif() {
+        guard notif.dailyEnabled, let summary = summaryForNotif() else { return }
+        notif.updateDailyBody(summary)
+    }
+
+    /// First non-heading paragraph from the markdown, capped at 140 chars.
     private func summaryForNotif() -> String? {
         guard insightGen.generatedAt != nil else { return nil }
         let text = insightGen.insight
