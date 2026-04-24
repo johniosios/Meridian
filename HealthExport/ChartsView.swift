@@ -40,7 +40,7 @@ final class ChartDataLoader: ObservableObject {
 
             for i in (0..<days).reversed() {
                 guard let day = cal.date(byAdding: .day, value: -i, to: today) else { continue }
-                let snap = try await healthStore.snapshot(for: day)
+                guard let snap = try? await healthStore.snapshot(for: day) else { continue }
                 if let s = snap.sleep.asleepMinutes {
                     sleepArr.append(ChartPoint(date: day, value: Double(s) / 60.0))
                 }
@@ -179,3 +179,4 @@ struct ChartCard: View {
         return String(format: "%.1f", v)
     }
 }
+

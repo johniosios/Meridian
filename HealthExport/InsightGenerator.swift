@@ -25,7 +25,7 @@ final class InsightGenerator: ObservableObject {
             var snapshots: [HealthDaySnapshot] = []
             for i in (0..<days).reversed() {
                 guard let day = cal.date(byAdding: .day, value: -i, to: today) else { continue }
-                let snap = try await healthStore.snapshot(for: day)
+                guard let snap = try? await healthStore.snapshot(for: day) else { continue }
                 snapshots.append(snap)
             }
 

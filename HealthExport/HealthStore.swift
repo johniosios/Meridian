@@ -281,7 +281,15 @@ final class HealthStore {
                 options: .cumulativeSum
             ) { _, result, error in
                 if let error = error {
-                    continuation.resume(throwing: error)
+                    // "No data available" is not a real failure — means 0 samples for this type that day.
+                    let ns = error as NSError
+                    let noData = ns.code == HKError.errorNoData.rawValue
+                        || ns.localizedDescription.contains("No data available")
+                    if noData {
+                        continuation.resume(returning: nil)
+                    } else {
+                        continuation.resume(throwing: error)
+                    }
                     return
                 }
                 continuation.resume(returning: result?.sumQuantity()?.doubleValue(for: unit))
