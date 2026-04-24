@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 struct SettingsView: View {
     @EnvironmentObject private var apiConfig: APIConfig
     @EnvironmentObject private var folderStore: FolderStore
+    @EnvironmentObject private var notif: NotificationManager
 
     @State private var showAPIKey = false
     @State private var showingFolderPicker = false
@@ -13,6 +14,7 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 aiSection
+                notificationSection
                 storageSection
                 automationSection
                 aboutSection
@@ -93,6 +95,53 @@ struct SettingsView: View {
             Text("AI 分析")
         } footer: {
             Text("API Key 存在设备 Keychain，重装 App 会清除。")
+                .font(.caption2)
+        }
+    }
+
+    // MARK: - Notification
+
+    private var notificationSection: some View {
+        Section {
+            Toggle("每日提醒", isOn: Binding(
+                get: { notif.dailyEnabled },
+                set: { newValue in
+                    Task {
+                        if newValue { await notif.enableDaily() }
+                        else { notif.disableDaily() }
+                    }
+                }
+            ))
+
+            if notif.dailyEnabled {
+                DatePicker(
+                    "提醒时间",
+                    selection: $notif.dailyTime,
+                    displayedComponents: .hourAndMinute
+                )
+
+                if !notif.isAuthorized {
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("系统通知权限未开启").font(.subheadline)
+                            Text("去 iPhone 设置 → 通知 → 每日健康 → 开启「允许通知」")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                Button {
+                    Task { await notif.triggerNow() }
+                } label: {
+                    Label("发送测试通知（5 秒后）", systemImage: "bell.badge")
+                }
+            }
+        } header: {
+            Text("每日通知")
+        } footer: {
+            Text("到点会弹系统横幅。点击通知打开 App 时，首页会自动重新生成 AI 洞察。本地通知，免费账号可用。")
                 .font(.caption2)
         }
     }

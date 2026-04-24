@@ -4,5 +4,7 @@
 <dict>
 	<key>UIFileSharingEnabled</key>
 	<true/>
+	<key>CFBundleDisplayName</key>
+	<string>每日健康</string>
 </dict>
 </plist>

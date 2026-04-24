@@ -3,6 +3,7 @@ import SwiftUI
 struct AppTabView: View {
     @StateObject private var apiConfig = APIConfig()
     @StateObject private var folderStore = FolderStore()
+    @StateObject private var notif = NotificationManager()
 
     var body: some View {
         TabView {
@@ -20,5 +21,6 @@ struct AppTabView: View {
         }
         .environmentObject(apiConfig)
         .environmentObject(folderStore)
+        .environmentObject(notif)
     }
 }

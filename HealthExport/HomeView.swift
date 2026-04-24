@@ -3,9 +3,11 @@ import Charts
 
 struct HomeView: View {
     @EnvironmentObject private var apiConfig: APIConfig
+    @EnvironmentObject private var notif: NotificationManager
     @StateObject private var insightGen = InsightGenerator()
     @StateObject private var home = HomeDataLoader()
     @State private var windowDays: Int = 7
+    @State private var autoGenTriggered = false
 
     var body: some View {
         NavigationStack {
@@ -33,7 +35,10 @@ struct HomeView: View {
                     .disabled(home.isLoading)
                 }
             }
-            .task { await home.load(days: windowDays) }
+            .task {
+                await home.load(days: windowDays)
+                await autoGenerateIfNeeded()
+            }
             .onChange(of: windowDays) { _, new in
                 Task { await home.load(days: new) }
             }
@@ -41,6 +46,14 @@ struct HomeView: View {
                 await home.load(days: windowDays)
                 if apiConfig.isConfigured {
                     await insightGen.generate(with: apiConfig, days: windowDays)
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .dailyNotificationTapped)) { _ in
+                Task {
+                    await home.load(days: windowDays)
+                    if apiConfig.isConfigured {
+                        await insightGen.generate(with: apiConfig, days: windowDays)
+                    }
                 }
             }
         }
@@ -329,6 +342,36 @@ struct HomeView: View {
         .padding(12)
         .background(Color(.systemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    // MARK: - Auto generate + push updated notif body
+
+    private func autoGenerateIfNeeded() async {
+        guard !autoGenTriggered, apiConfig.isConfigured else { return }
+        let alreadyToday = insightGen.generatedAt.map {
+            Calendar.current.isDateInToday($0)
+        } ?? false
+        guard !alreadyToday else { return }
+
+        autoGenTriggered = true
+        await insightGen.generate(with: apiConfig, days: windowDays)
+
+        // Feed fresh insight into the daily scheduled notification body.
+        if notif.dailyEnabled, let summary = summaryForNotif() {
+            notif.updateDailyBody(summary)
+        }
+    }
+
+    /// Extract a short body (first non-heading paragraph, up to 140 chars) for notification.
+    private func summaryForNotif() -> String? {
+        guard insightGen.generatedAt != nil else { return nil }
+        let text = insightGen.insight
+        let paragraphs = text
+            .components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && !$0.hasPrefix("#") && !$0.hasPrefix("-") && !$0.hasPrefix("*") }
+        let first = paragraphs.first ?? text
+        return String(first.prefix(140))
     }
 }
 
