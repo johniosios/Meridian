@@ -169,6 +169,51 @@ final class HomeDataLoader: ObservableObject {
             ))
         }
 
+        // 当日睡眠不足 7h（即使没连续 3 天也提示一下）
+        if let sleep = metrics.sleepHours, sleep < 7.0, sleep >= 0.1 {
+            result.append(.init(
+                severity: .warn,
+                title: String(format: "今日睡眠 %.1f 小时", sleep),
+                detail: "建议目标 7-8 小时，今晚尽量早睡"
+            ))
+        }
+
+        // 当日步数未达 8000（通用健康门槛）
+        if let today = metrics.steps, today > 0, today < 8000 {
+            result.append(.init(
+                severity: .warn,
+                title: "步数未达 8000",
+                detail: "今日 \(today) 步，离日常健康门槛还差 \(8000 - today) 步"
+            ))
+        }
+
+        // 当日锻炼时长少
+        if let snap = snapshots.last?.1,
+           let exercise = snap.activity.exerciseMinutes, exercise < 15 {
+            result.append(.init(
+                severity: .warn,
+                title: "今日锻炼时间较短",
+                detail: "\(exercise) 分钟，建议至少 30 分钟中高强度活动"
+            ))
+        }
+
+        // VO2Max 趋势（简单版：有就展示当前分级）
+        if let snap = snapshots.last?.1,
+           let vo2 = snap.respiratory.vo2Max {
+            let level: (String, HealthAlert.Severity)
+            switch vo2 {
+            case ..<30:    level = ("偏低（需加强有氧）", .warn)
+            case 30..<40:  level = ("中等", .good)
+            case 40..<50:  level = ("良好", .good)
+            default:       level = ("优秀", .good)
+            }
+            result.append(.init(
+                severity: level.1,
+                title: String(format: "VO2Max %.1f · %@", vo2, level.0),
+                detail: "心肺耐力分，反映长期有氧能力"
+            ))
+        }
+
         return result
     }
 }

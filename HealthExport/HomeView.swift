@@ -157,19 +157,30 @@ struct HomeView: View {
     // MARK: - Alerts
 
     private var alertsSection: some View {
-        Group {
-            if !home.alerts.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("提醒")
-                            .font(.caption).foregroundStyle(.secondary).textCase(.uppercase)
-                        Spacer()
-                        Text("\(home.alerts.count) 项")
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("提醒")
+                    .font(.caption).foregroundStyle(.secondary).textCase(.uppercase)
+                Spacer()
+                Text(home.alerts.isEmpty ? "无异常" : "\(home.alerts.count) 项")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if home.alerts.isEmpty {
+                HStack(alignment: .top, spacing: 10) {
+                    Circle().fill(Color.green).frame(width: 10, height: 10).padding(.top, 6)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("今天各项指标正常").font(.subheadline).bold()
+                        Text("睡眠 / 心率 / 活动 / VO2Max 均未触发警示规则")
                             .font(.caption).foregroundStyle(.secondary)
                     }
-                    ForEach(home.alerts) { alert in
-                        alertRow(alert)
-                    }
+                    Spacer()
+                }
+                .padding(12)
+                .background(Color(.systemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            } else {
+                ForEach(home.alerts) { alert in
+                    alertRow(alert)
                 }
             }
         }
