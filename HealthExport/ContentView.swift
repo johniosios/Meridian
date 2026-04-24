@@ -2,7 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct ContentView: View {
-    @StateObject private var folderStore = FolderStore()
+    @EnvironmentObject private var folderStore: FolderStore
     @StateObject private var orch = Orchestrator()
 
     @State private var showingFolderPicker = false
