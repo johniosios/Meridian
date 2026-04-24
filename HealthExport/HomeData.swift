@@ -48,7 +48,10 @@ final class HomeDataLoader: ObservableObject {
     @Published var isLoading = false
     @Published var loadError: String?
 
-    func load() async {
+    private(set) var windowDays: Int = 7
+
+    func load(days: Int = 7) async {
+        windowDays = days
         isLoading = true
         loadError = nil
         defer { isLoading = false }
@@ -64,7 +67,7 @@ final class HomeDataLoader: ObservableObject {
         let today = cal.startOfDay(for: Date())
 
         var snapshots: [(Date, HealthDaySnapshot)] = []
-        for i in (0..<7).reversed() {
+        for i in (0..<days).reversed() {
             guard let day = cal.date(byAdding: .day, value: -i, to: today) else { continue }
             guard let snap = try? await healthStore.snapshot(for: day) else { continue }
             snapshots.append((day, snap))
@@ -89,7 +92,7 @@ final class HomeDataLoader: ObservableObject {
             hrvAvg: hrvArr.avg
         )
 
-        alerts = computeAlerts(snapshots: snapshots, metrics: metrics, sleepArr: sleepArr)
+        alerts = computeAlerts(snapshots: snapshots, metrics: metrics, sleepArr: sleepArr, days: days)
 
         sleepTrend = snapshots.compactMap { (day, snap) in
             guard let m = snap.sleep.asleepMinutes else { return nil }
@@ -104,11 +107,12 @@ final class HomeDataLoader: ObservableObject {
     private func computeAlerts(
         snapshots: [(Date, HealthDaySnapshot)],
         metrics: TodayMetrics,
-        sleepArr: [Double]
+        sleepArr: [Double],
+        days: Int
     ) -> [HealthAlert] {
         var result: [HealthAlert] = []
 
-        // Sleep: 连续 3 天 < 6.5h
+        // Sleep: 连续 3 天 < 6.5h（固定 3 天窗口，急性信号）
         let recent3 = Array(sleepArr.suffix(3))
         if recent3.count == 3, recent3.allSatisfy({ $0 < 6.5 }) {
             let avg3 = recent3.reduce(0, +) / 3
@@ -119,49 +123,49 @@ final class HomeDataLoader: ObservableObject {
             ))
         }
 
-        // Resting HR: today > 7d avg + 5
+        // Resting HR: today vs window avg
         if let today = metrics.restingHR, let avg = metrics.restingHRAvg {
             let diff = Double(today) - avg
             if diff > 5 {
                 result.append(.init(
                     severity: .bad,
                     title: "静息心率偏高 +\(Int(diff))bpm",
-                    detail: "vs 近 7 日均 \(Int(avg))bpm，可能疲劳或压力上升"
+                    detail: "vs 近 \(days) 日均 \(Int(avg))bpm，可能疲劳或压力上升"
                 ))
             } else if diff < -5 {
                 result.append(.init(
                     severity: .good,
                     title: "静息心率改善 \(Int(diff))bpm",
-                    detail: "vs 近 7 日均 \(Int(avg))bpm，恢复良好"
+                    detail: "vs 近 \(days) 日均 \(Int(avg))bpm，恢复良好"
                 ))
             }
         }
 
-        // HRV: today vs 7d avg
+        // HRV: today vs window avg
         if let today = metrics.hrv, let avg = metrics.hrvAvg {
             let diff = today - avg
             if diff < -5 {
                 result.append(.init(
                     severity: .warn,
                     title: String(format: "HRV 下降 %.0fms", abs(diff)),
-                    detail: "vs 近 7 日均 \(Int(avg))ms，建议训练减量"
+                    detail: "vs 近 \(days) 日均 \(Int(avg))ms，建议训练减量"
                 ))
             } else if diff > 5 {
                 result.append(.init(
                     severity: .good,
                     title: String(format: "HRV 改善 +%.0fms", diff),
-                    detail: "vs 近 7 日均 \(Int(avg))ms，状态良好"
+                    detail: "vs 近 \(days) 日均 \(Int(avg))ms，状态良好"
                 ))
             }
         }
 
-        // Steps today < 3000 but weekly avg > 6000 → alert
+        // Steps today 显著低于窗口均值
         if let today = metrics.steps, let avg = metrics.stepsAvg,
            Double(today) < 3000, avg > 6000 {
             result.append(.init(
                 severity: .warn,
                 title: "今日活动偏少",
-                detail: "\(today) 步 vs 7日均 \(Int(avg)) 步"
+                detail: "\(today) 步 vs \(days)日均 \(Int(avg)) 步"
             ))
         }
 

@@ -5,7 +5,7 @@ struct HomeView: View {
     @EnvironmentObject private var apiConfig: APIConfig
     @StateObject private var insightGen = InsightGenerator()
     @StateObject private var home = HomeDataLoader()
-    @State private var insightDays: Int = 7
+    @State private var windowDays: Int = 7
 
     var body: some View {
         NavigationStack {
@@ -26,18 +26,21 @@ struct HomeView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        Task { await home.load() }
+                        Task { await home.load(days: windowDays) }
                     } label: {
                         Image(systemName: "arrow.clockwise")
                     }
                     .disabled(home.isLoading)
                 }
             }
-            .task { await home.load() }
+            .task { await home.load(days: windowDays) }
+            .onChange(of: windowDays) { _, new in
+                Task { await home.load(days: new) }
+            }
             .refreshable {
-                await home.load()
+                await home.load(days: windowDays)
                 if apiConfig.isConfigured {
-                    await insightGen.generate(with: apiConfig, days: insightDays)
+                    await insightGen.generate(with: apiConfig, days: windowDays)
                 }
             }
         }
@@ -54,7 +57,7 @@ struct HomeView: View {
                     .foregroundStyle(.white.opacity(0.9))
                 Spacer()
                 Button {
-                    Task { await insightGen.generate(with: apiConfig, days: insightDays) }
+                    Task { await insightGen.generate(with: apiConfig, days: windowDays) }
                 } label: {
                     HStack(spacing: 4) {
                         if insightGen.isGenerating {
@@ -114,14 +117,25 @@ struct HomeView: View {
 
     private var rangePicker: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("AI 分析窗口")
-                .font(.caption).foregroundStyle(.secondary).textCase(.uppercase)
-            Picker("", selection: $insightDays) {
+            HStack {
+                Text("时间窗口")
+                    .font(.caption).foregroundStyle(.secondary).textCase(.uppercase)
+                Spacer()
+                if home.isLoading {
+                    HStack(spacing: 4) {
+                        ProgressView().controlSize(.mini)
+                        Text("加载中").font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            Picker("", selection: $windowDays) {
                 Text("7 天").tag(7)
                 Text("14 天").tag(14)
                 Text("30 天").tag(30)
             }
             .pickerStyle(.segmented)
+            Text("影响：提醒基准、指标对比、趋势长度、AI 分析输入。切换后点「重新生成」更新 AI。")
+                .font(.caption2).foregroundStyle(.secondary)
         }
     }
 
@@ -203,7 +217,7 @@ struct HomeView: View {
                     emoji: "🏃",
                     label: "步数",
                     value: home.metrics.steps.map { "\($0)" } ?? "—",
-                    trend: home.metrics.stepsAvg.map { "7日均 \(Int($0))" } ?? "无基线",
+                    trend: home.metrics.stepsAvg.map { "\(windowDays)日均 \(Int($0))" } ?? "无基线",
                     trendColor: .gray
                 )
                 MetricCard(
@@ -229,7 +243,7 @@ struct HomeView: View {
         let diff = today - avg
         if abs(diff) < 0.1 { return "与基线一致" }
         let arrow = diff > 0 ? "↑" : "↓"
-        return String(format: "%@ %.1f%@ vs 7日均", arrow, abs(diff), unit)
+        return String(format: "%@ %.1f%@ vs %d日均", arrow, abs(diff), unit, windowDays)
     }
 
     private func trendColor(today: Double?, avg: Double?, higherIsBetter: Bool) -> Color {
@@ -246,7 +260,7 @@ struct HomeView: View {
     private var miniTrendsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("近 7 天趋势")
+                Text("近 \(windowDays) 天趋势")
                     .font(.caption).foregroundStyle(.secondary).textCase(.uppercase)
                 Spacer()
                 NavigationLink(destination: ChartsView()) {
