@@ -250,7 +250,7 @@ struct HomeView: View {
                     .font(.caption).foregroundStyle(.secondary).textCase(.uppercase)
                 Spacer()
                 NavigationLink(destination: ChartsView()) {
-                    Text("查看全部 ›").font(.caption).foregroundStyle(.accentColor)
+                    Text("查看全部 ›").font(.caption).foregroundStyle(Color.accentColor)
                 }
             }
             miniTrend(title: "睡眠（小时）", points: home.sleepTrend, color: .indigo)
