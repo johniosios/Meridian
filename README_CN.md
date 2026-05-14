@@ -28,7 +28,6 @@
   <img src="assets/screenshot-settings.png" width="30%" alt="设置" />
 </div>
 
-> 截图待补充。贡献方式：运行 App，截图「今日 / 趋势 / 设置」三个 Tab，保存到 `assets/` 提 PR。
 
 ---
 

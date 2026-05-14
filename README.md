@@ -28,7 +28,6 @@
   <img src="assets/screenshot-settings.png" width="30%" alt="Settings" />
 </div>
 
-> Screenshots coming soon. To contribute: run the app, take 3 screenshots (Home / Charts / Settings), save to `assets/` and open a PR.
 
 ---
 
