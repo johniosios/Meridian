@@ -77,6 +77,119 @@ Schema: see [`SPEC.md`](SPEC.md)
 
 ---
 
+## Personal AI health assistant (advanced)
+
+Once your health data is syncing to Mac, you can wire it into any local AI agent — giving it real-time awareness of your body state alongside your calendar, notes, or work context.
+
+### How it works
+
+```
+iPhone HealthKit
+  ↓  HealthLens exports daily JSON
+iCloud Drive  ──sync──▶  Mac ~/Library/Mobile Documents/.../
+                              ↓
+                         AI Agent reads last N days
+                              ↓
+                    "Should I train hard today?"
+                    "Why was my HRV low this week?"
+                    "Best time to do deep work this afternoon?"
+```
+
+The agent answers by combining your health data with whatever else it knows — meeting notes, mood logs, project state. Health data becomes one more sensor, not a separate app.
+
+### Step 1 — find your sync path
+
+After picking an iCloud folder in the app, the files land at:
+
+```bash
+~/Library/Mobile\ Documents/com~apple~CloudDocs/<your-folder>/
+# e.g.
+~/Library/Mobile\ Documents/com~apple~CloudDocs/HealthLens/
+```
+
+Verify with:
+
+```bash
+ls ~/Library/Mobile\ Documents/com~apple~CloudDocs/HealthLens/ | tail -5
+# 2026-05-10.json
+# 2026-05-11.json
+# 2026-05-12.json
+# 2026-05-13.json
+# 2026-05-14.json
+```
+
+### Step 2 — read health data in your agent
+
+A minimal Python helper that any agent can call:
+
+```python
+import json, os
+from datetime import date, timedelta
+from pathlib import Path
+
+HEALTH_DIR = Path.home() / "Library/Mobile Documents/com~apple~CloudDocs/HealthLens"
+
+def read_health(days: int = 7) -> list[dict]:
+    """Return the last N days of health snapshots, newest first."""
+    snapshots = []
+    for i in range(days):
+        d = date.today() - timedelta(days=i)
+        path = HEALTH_DIR / f"{d}.json"
+        if path.exists():
+            snapshots.append(json.loads(path.read_text()))
+    return snapshots
+
+def health_summary(days: int = 7) -> str:
+    """One-liner summary for injecting into a system prompt."""
+    data = read_health(days)
+    if not data:
+        return "No health data available."
+    lines = []
+    for s in data:
+        parts = [s["date"]]
+        if s.get("sleep", {}).get("asleep_minutes"):
+            parts.append(f"sleep {s['sleep']['asleep_minutes']//60}h{s['sleep']['asleep_minutes']%60}m")
+        if s.get("heart", {}).get("hrv_sdnn_ms"):
+            parts.append(f"HRV {s['heart']['hrv_sdnn_ms']:.0f}ms")
+        if s.get("heart", {}).get("resting_bpm"):
+            parts.append(f"RHR {s['heart']['resting_bpm']}bpm")
+        if s.get("activity", {}).get("steps"):
+            parts.append(f"steps {s['activity']['steps']:,}")
+        lines.append("  " + " · ".join(parts))
+    return "Recent health data:\n" + "\n".join(lines)
+```
+
+### Step 3 — inject into your agent's system prompt
+
+```python
+system_prompt = f"""
+You are a personal assistant with full context about the user.
+
+{health_summary(days=7)}
+
+Use this data to inform advice about energy, focus, training, and recovery.
+Never surface raw numbers unless asked — interpret them instead.
+"""
+```
+
+### Step 4 — example queries that now work
+
+| Query | What the agent uses |
+|---|---|
+| "Should I do a hard workout today?" | HRV trend + resting HR vs baseline |
+| "Why have I been tired this week?" | Sleep duration + consistency over 7 days |
+| "Best time for deep work this afternoon?" | Last night's sleep quality |
+| "Am I overtraining?" | HRV decline + active energy over 14 days |
+
+### Works with any agent framework
+
+- **Claude Code** — add `read_health()` as a tool in your `CLAUDE.md`
+- **MCP server** — expose `read_health` as an MCP resource
+- **LangChain / LlamaIndex** — wrap as a `Tool` with the helper above
+- **Any local agent** — call `health_summary()` at conversation start
+
+---
+
 ## Architecture
 
 ```

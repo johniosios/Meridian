@@ -77,6 +77,117 @@ JSON 格式：见 [`SPEC.md`](SPEC.md)
 
 ---
 
+## 打造个人 AI 健康助手（进阶）
+
+健康数据同步到 Mac 之后，可以接入任意本地 AI agent，让它实时感知你的身体状态——结合日历、笔记、工作上下文，给出真正个性化的建议。
+
+### 整体链路
+
+```
+iPhone HealthKit
+  ↓  HealthLens 每日导出 JSON
+iCloud Drive  ──自动同步──▶  Mac ~/Library/Mobile Documents/.../
+                                    ↓
+                             AI Agent 读取最近 N 天
+                                    ↓
+                      「今天适合高强度训练吗？」
+                      「这周 HRV 为什么低？」
+                      「今天下午什么时候适合深度工作？」
+```
+
+Agent 综合你的健康数据 + 其他上下文（日报、情绪、项目进展）来回答，健康数据变成 agent 的一个感知维度，而不是孤立的 App。
+
+### 第一步 — 确认同步路径
+
+在 App 设置里选好 iCloud 目录后，文件会出现在：
+
+```bash
+~/Library/Mobile\ Documents/com~apple~CloudDocs/<你的目录>/
+# 例如
+~/Library/Mobile\ Documents/com~apple~CloudDocs/HealthLens/
+```
+
+验证：
+
+```bash
+ls ~/Library/Mobile\ Documents/com~apple~CloudDocs/HealthLens/ | tail -5
+# 2026-05-10.json
+# 2026-05-11.json
+# ...
+```
+
+### 第二步 — 在 agent 里读取健康数据
+
+一个任何 agent 都能直接调用的 Python 工具：
+
+```python
+import json, os
+from datetime import date, timedelta
+from pathlib import Path
+
+HEALTH_DIR = Path.home() / "Library/Mobile Documents/com~apple~CloudDocs/HealthLens"
+
+def read_health(days: int = 7) -> list[dict]:
+    """返回最近 N 天的健康数据，最新的在前。"""
+    snapshots = []
+    for i in range(days):
+        d = date.today() - timedelta(days=i)
+        path = HEALTH_DIR / f"{d}.json"
+        if path.exists():
+            snapshots.append(json.loads(path.read_text()))
+    return snapshots
+
+def health_summary(days: int = 7) -> str:
+    """生成一段文字，可直接注入 system prompt。"""
+    data = read_health(days)
+    if not data:
+        return "暂无健康数据。"
+    lines = []
+    for s in data:
+        parts = [s["date"]]
+        if s.get("sleep", {}).get("asleep_minutes"):
+            parts.append(f"睡眠 {s['sleep']['asleep_minutes']//60}h{s['sleep']['asleep_minutes']%60}m")
+        if s.get("heart", {}).get("hrv_sdnn_ms"):
+            parts.append(f"HRV {s['heart']['hrv_sdnn_ms']:.0f}ms")
+        if s.get("heart", {}).get("resting_bpm"):
+            parts.append(f"静息心率 {s['heart']['resting_bpm']}bpm")
+        if s.get("activity", {}).get("steps"):
+            parts.append(f"步数 {s['activity']['steps']:,}")
+        lines.append("  " + " · ".join(parts))
+    return "最近健康数据：\n" + "\n".join(lines)
+```
+
+### 第三步 — 注入 system prompt
+
+```python
+system_prompt = f"""
+你是用户的个人助手，掌握用户的完整上下文。
+
+{health_summary(days=7)}
+
+根据以上数据为用户提供关于精力、专注力、训练和恢复的建议。
+除非用户主动询问，不要直接罗列原始数字——给出解读。
+"""
+```
+
+### 第四步 — 现在可以问的问题
+
+| 问题 | Agent 使用的数据 |
+|---|---|
+| 今天适合高强度训练吗？ | HRV 趋势 + 静息心率与基线对比 |
+| 这周为什么一直很累？ | 7 天睡眠时长 + 规律性 |
+| 今天下午什么时候适合深度工作？ | 昨晚睡眠质量 |
+| 我是不是过度训练了？ | 14 天 HRV 下降趋势 + 活动能量 |
+
+### 兼容任意 agent 框架
+
+- **Claude Code** — 在 `CLAUDE.md` 里把 `read_health()` 声明为工具
+- **MCP server** — 将 `read_health` 暴露为 MCP resource
+- **LangChain / LlamaIndex** — 封装成 `Tool`
+- **任意本地 agent** — 对话开始时调用 `health_summary()` 注入上下文
+
+---
+
 ## 架构
 
 ```
