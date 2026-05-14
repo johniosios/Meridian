@@ -1,7 +1,7 @@
 import Foundation
 import HealthKit
 
-final class HealthStore {
+final class HealthStore: ObservableObject {
     private let store = HKHealthStore()
 
     static var isAvailable: Bool { HKHealthStore.isHealthDataAvailable() }

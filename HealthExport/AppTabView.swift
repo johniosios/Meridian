@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct AppTabView: View {
+    @StateObject private var healthStore = HealthStore()
     @StateObject private var apiConfig = APIConfig()
     @StateObject private var folderStore = FolderStore()
     @StateObject private var notif = NotificationManager()
@@ -19,6 +20,7 @@ struct AppTabView: View {
             SettingsView()
                 .tabItem { Label("设置", systemImage: "gear") }
         }
+        .environmentObject(healthStore)
         .environmentObject(apiConfig)
         .environmentObject(folderStore)
         .environmentObject(notif)

@@ -2,6 +2,7 @@ import SwiftUI
 import Charts
 
 struct HomeView: View {
+    @EnvironmentObject private var healthStore: HealthStore
     @EnvironmentObject private var apiConfig: APIConfig
     @EnvironmentObject private var notif: NotificationManager
     @Environment(\.scenePhase) private var scenePhase
@@ -31,7 +32,7 @@ struct HomeView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        Task { await home.load(days: windowDays) }
+                        Task { await home.load(healthStore: healthStore, days: windowDays) }
                     } label: {
                         Image(systemName: "arrow.clockwise")
                     }
@@ -42,7 +43,7 @@ struct HomeView: View {
                 await loadAndAutoGenerate()
             }
             .onChange(of: windowDays) { _, new in
-                Task { await home.load(days: new) }
+                Task { await home.load(healthStore: healthStore, days: new) }
             }
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active {
@@ -50,17 +51,17 @@ struct HomeView: View {
                 }
             }
             .refreshable {
-                await home.load(days: windowDays)
+                await home.load(healthStore: healthStore, days: windowDays)
                 if apiConfig.isConfigured {
-                    await insightGen.generate(with: apiConfig, days: windowDays)
+                    await insightGen.generate(healthStore: healthStore, apiConfig: apiConfig, days: windowDays)
                     pushLatestInsightToNotif()
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: .dailyNotificationTapped)) { _ in
                 Task {
-                    await home.load(days: windowDays)
+                    await home.load(healthStore: healthStore, days: windowDays)
                     if apiConfig.isConfigured {
-                        await insightGen.generate(with: apiConfig, days: windowDays)
+                        await insightGen.generate(healthStore: healthStore, apiConfig: apiConfig, days: windowDays)
                         pushLatestInsightToNotif()
                     }
                 }
@@ -79,7 +80,7 @@ struct HomeView: View {
                     .foregroundStyle(.white.opacity(0.9))
                 Spacer()
                 Button {
-                    Task { await insightGen.generate(with: apiConfig, days: windowDays) }
+                    Task { await insightGen.generate(healthStore: healthStore, apiConfig: apiConfig, days: windowDays) }
                 } label: {
                     HStack(spacing: 4) {
                         if insightGen.isGenerating {
@@ -357,9 +358,9 @@ struct HomeView: View {
 
     /// Refreshes home metrics on every entry; regenerates AI if configured and cooldown elapsed.
     private func loadAndAutoGenerate() async {
-        await home.load(days: windowDays)
+        await home.load(healthStore: healthStore, days: windowDays)
         guard apiConfig.isConfigured, shouldAutoRegenerate() else { return }
-        await insightGen.generate(with: apiConfig, days: windowDays)
+        await insightGen.generate(healthStore: healthStore, apiConfig: apiConfig, days: windowDays)
         pushLatestInsightToNotif()
     }
 

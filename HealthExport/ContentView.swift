@@ -2,6 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct ContentView: View {
+    @EnvironmentObject private var healthStore: HealthStore
     @EnvironmentObject private var folderStore: FolderStore
     @StateObject private var orch = Orchestrator()
 
@@ -73,7 +74,7 @@ struct ContentView: View {
             LazyVGrid(columns: [.init(.flexible()), .init(.flexible()), .init(.flexible())], spacing: 8) {
                 ForEach(DateRangePreset.allCases) { preset in
                     Button {
-                        Task { await orch.export(preset: preset, folder: folderStore.folderURL) }
+                        Task { await orch.export(healthStore: healthStore, preset: preset, folder: folderStore.folderURL) }
                     } label: {
                         Text(preset.title)
                             .font(.subheadline)
@@ -100,6 +101,7 @@ struct ContentView: View {
             Button {
                 Task {
                     await orch.exportRange(
+                        healthStore: healthStore,
                         from: customStart,
                         to: customEnd,
                         folder: folderStore.folderURL,

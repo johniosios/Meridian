@@ -3,7 +3,6 @@ import Combine
 
 @MainActor
 final class Orchestrator: ObservableObject {
-    private let healthStore = HealthStore()
     private let exporter = Exporter()
 
     @Published var lastRunStatus: String = "未运行"
@@ -13,12 +12,12 @@ final class Orchestrator: ObservableObject {
 
     var fallbackFolderURL: URL { exporter.fallbackFolderURL }
 
-    func export(preset: DateRangePreset, folder: URL?) async {
+    func export(healthStore: HealthStore, preset: DateRangePreset, folder: URL?) async {
         let (start, end) = preset.range()
-        await exportRange(from: start, to: end, folder: folder, label: preset.title)
+        await exportRange(healthStore: healthStore, from: start, to: end, folder: folder, label: preset.title)
     }
 
-    func exportRange(from start: Date, to end: Date, folder: URL?, label: String? = nil) async {
+    func exportRange(healthStore: HealthStore, from start: Date, to end: Date, folder: URL?, label: String? = nil) async {
         isRunning = true
         progressCurrent = 0
         progressTotal = 0

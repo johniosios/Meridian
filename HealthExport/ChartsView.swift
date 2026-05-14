@@ -10,7 +10,6 @@ struct ChartPoint: Identifiable {
 
 @MainActor
 final class ChartDataLoader: ObservableObject {
-    private let healthStore = HealthStore()
 
     @Published var sleepHours: [ChartPoint] = []
     @Published var steps: [ChartPoint] = []
@@ -21,7 +20,7 @@ final class ChartDataLoader: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
 
-    func load(days: Int) async {
+    func load(healthStore: HealthStore, days: Int) async {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -74,6 +73,7 @@ final class ChartDataLoader: ObservableObject {
 }
 
 struct ChartsView: View {
+    @EnvironmentObject private var healthStore: HealthStore
     @StateObject private var loader = ChartDataLoader()
     @State private var days: Int = 7
 
@@ -109,14 +109,14 @@ struct ChartsView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        Task { await loader.load(days: days) }
+                        Task { await loader.load(healthStore: healthStore, days: days) }
                     } label: { Image(systemName: "arrow.clockwise") }
                     .disabled(loader.isLoading)
                 }
             }
-            .task { await loader.load(days: days) }
+            .task { await loader.load(healthStore: healthStore, days: days) }
             .onChange(of: days) { _, new in
-                Task { await loader.load(days: new) }
+                Task { await loader.load(healthStore: healthStore, days: new) }
             }
         }
     }

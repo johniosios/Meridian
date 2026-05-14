@@ -4,8 +4,6 @@ import Combine
 @MainActor
 final class InsightGenerator: ObservableObject {
 
-    private let healthStore = HealthStore()
-
     @Published var insight: String = "点「生成洞察」让 AI 分析最近数据，给出摘要 + 提醒。"
     @Published var alerts: [HealthAlert] = []
     @Published var isGenerating = false
@@ -13,7 +11,7 @@ final class InsightGenerator: ObservableObject {
     @Published var generatedAt: Date?
     @Published var lastSummary: String?
 
-    func generate(with apiConfig: APIConfig, days: Int = 7) async {
+    func generate(healthStore: HealthStore, apiConfig: APIConfig, days: Int = 7) async {
         isGenerating = true
         lastError = nil
         defer { isGenerating = false }
