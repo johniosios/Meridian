@@ -18,15 +18,15 @@ jobs:
       - name: Build (no signing)
         run: |
           xcodebuild build \
-            -project HealthLens.xcodeproj \
-            -scheme HealthLens \
+            -project Meridian.xcodeproj \
+            -scheme Meridian \
             -destination 'generic/platform=iOS Simulator' \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             | xcpretty || xcodebuild build \
-              -project HealthLens.xcodeproj \
-              -scheme HealthLens \
+              -project Meridian.xcodeproj \
+              -scheme Meridian \
               -destination 'generic/platform=iOS Simulator' \
               CODE_SIGN_IDENTITY="" \
               CODE_SIGNING_REQUIRED=NO \
@@ -35,8 +35,8 @@ jobs:
       - name: Run unit tests
         run: |
           xcodebuild test \
-            -project HealthLens.xcodeproj \
-            -scheme HealthLensTests \
+            -project Meridian.xcodeproj \
+            -scheme Meridian \
             -destination 'platform=iOS Simulator,name=iPhone 16' \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \

@@ -1,46 +1,10 @@
-<div align="center">
-  <img src="assets/icon.png" width="160" alt="HealthLens" /><br/><br/>
-  <h2>HealthLens</h2>
-  <p><b>AI health analysis from your Apple Watch.</b><br/>Private · On-device · No backend · No account.</p>
+# Meridian
 
-  <p>
-    <a href="https://github.com/whwhw/HealthLens/actions/workflows/build.yml">
-      <img src="https://github.com/whwhw/HealthLens/actions/workflows/build.yml/badge.svg?style=flat-square" alt="Build" />
-    </a>
-    &nbsp;
-    <img src="https://img.shields.io/badge/iOS-17%2B-007AFF?style=flat-square&logo=apple&logoColor=white" />
-    &nbsp;
-    <img src="https://img.shields.io/badge/Swift-5.9%2B-FA7343?style=flat-square&logo=swift&logoColor=white" />
-    &nbsp;
-    <img src="https://img.shields.io/badge/License-MIT-34C759?style=flat-square" />
-    &nbsp;
-    <img src="https://img.shields.io/badge/Dependencies-Zero-8E8E93?style=flat-square" />
-  </p>
-
-  <p>
-    <a href="README_CN.md">中文文档</a>
-  </p>
-</div>
-
-<br/>
+Private, on-device AI analysis of your Apple Watch data. No backend, no account, no data leaving your iCloud.
 
 <div align="center">
-  <img src="assets/screenshot-home.png" width="28%" />
-  &nbsp;&nbsp;&nbsp;
-  <img src="assets/screenshot-charts.png" width="28%" />
-  &nbsp;&nbsp;&nbsp;
-  <img src="assets/screenshot-settings.png" width="28%" />
-  <br/>
-  <sub>Home · Trends · Settings</sub>
+  <img src="assets/icon.png" width="160" alt="Meridian" />
 </div>
-
-<br/>
-
----
-
-## What it does
-
-HealthLens reads your Apple Watch data from HealthKit and runs AI analysis **entirely on your device** — no server, no account, no data leaves your iCloud.
 
 | | Feature |
 |:---:|---|
@@ -50,7 +14,6 @@ HealthLens reads your Apple Watch data from HealthKit and runs AI analysis **ent
 | ☁️ | **iCloud Export** — daily JSON syncs to Mac automatically |
 | ⏰ | **Shortcuts Automation** — set once, runs every night |
 | 🔐 | **Private by design** — API key in Keychain, data stays in your iCloud |
-| 💸 | **Free account** — no $99/year Apple Developer subscription needed |
 
 ---
 
@@ -59,11 +22,10 @@ HealthLens reads your Apple Watch data from HealthKit and runs AI analysis **ent
 > Requires Xcode 16+ · iPhone with Apple Watch data · API key from [Anthropic](https://console.anthropic.com) or OpenAI
 
 ```bash
-git clone https://github.com/whwhw/HealthLens.git
-open HealthExport.xcodeproj
+open Meridian.xcodeproj
 ```
 
-1. **Signing & Capabilities** — set your Team, change Bundle ID to `com.yourname.healthlens`
+1. **Signing & Capabilities** — set your Team and Bundle ID
 2. Connect iPhone → **▶ Run**
 3. Grant HealthKit permissions on first launch
 4. **Settings → AI Analysis** → paste your API key
@@ -81,8 +43,6 @@ Export daily JSON snapshots to iCloud Drive — they auto-sync to your Mac for d
 2. App stores a security-scoped bookmark (no iCloud Capability required)
 3. Files land at `~/Library/Mobile Documents/com~apple~CloudDocs/<folder>/`
 
-→ See [`SPEC.md`](SPEC.md) for the full JSON schema.
-
 ---
 
 ## Use as an AI agent data source
@@ -92,7 +52,7 @@ Once data is on your Mac, any AI agent can read it and answer questions like:
 > *"Should I train hard today?"* &nbsp; *"Why have I been tired this week?"* &nbsp; *"Best time for deep work this afternoon?"*
 
 <details>
-<summary><b>Integration guide (Python · Claude Code · MCP)</b></summary>
+<summary><b>Integration guide (Python · MCP)</b></summary>
 
 <br/>
 
@@ -100,7 +60,7 @@ Once data is on your Mac, any AI agent can read it and answer questions like:
 
 ```
 iPhone HealthKit
-  ↓  HealthLens exports daily JSON
+  ↓  Meridian exports daily JSON
 iCloud Drive ──sync──▶ Mac ~/Library/Mobile Documents/.../
                              ↓
                         AI Agent reads last N days
@@ -111,7 +71,7 @@ iCloud Drive ──sync──▶ Mac ~/Library/Mobile Documents/.../
 **Step 1 — verify your sync path**
 
 ```bash
-ls ~/Library/Mobile\ Documents/com~apple~CloudDocs/HealthLens/ | tail -5
+ls ~/Library/Mobile\ Documents/com~apple~CloudDocs/Meridian/ | tail -5
 # 2026-05-10.json  2026-05-11.json  ...  2026-05-14.json
 ```
 
@@ -122,7 +82,7 @@ import json
 from datetime import date, timedelta
 from pathlib import Path
 
-HEALTH_DIR = Path.home() / "Library/Mobile Documents/com~apple~CloudDocs/HealthLens"
+HEALTH_DIR = Path.home() / "Library/Mobile Documents/com~apple~CloudDocs/Meridian"
 
 def read_health(days: int = 7) -> list[dict]:
     snapshots = []
@@ -169,7 +129,6 @@ Interpret patterns — don't just repeat raw numbers.
 
 | Framework | How |
 |---|---|
-| Claude Code | Add `read_health()` as a tool in `CLAUDE.md` |
 | MCP server | Expose `read_health` as an MCP resource |
 | LangChain / LlamaIndex | Wrap as a `Tool` |
 | Any local agent | Call `health_summary()` at conversation start |
@@ -196,7 +155,7 @@ AppTabView
     ├── ChartsView
     │   └── ChartDataLoader  — 6 time-series charts
     │
-    ├── ContentView (Export tab)
+    ├── ExportView (Export tab)
     │   └── Orchestrator     — date range → JSON pipeline
     │
     └── SettingsView
@@ -220,19 +179,9 @@ AppTabView
 
 ---
 
-## Why I built this
-
-Apple Health has the data. What it lacks is interpretation.
-
-I wanted something that looks at 7 days of my sleep + HRV + steps and tells me *what it means* — not a dashboard of numbers, but a paragraph that says *"your recovery is solid but sleep consistency is slipping."*
-
-Also wanted to prove a non-iOS developer can ship a real iOS app in a weekend with AI coding tools. **Built in 3 days with zero prior Swift experience**, using Claude Code to write all the Swift.
-
----
-
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) — one concern per PR, test on real device, keep zero-dependency rule.
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

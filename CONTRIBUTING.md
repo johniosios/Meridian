@@ -2,7 +2,7 @@
 
 ## Before you start
 
-This is a personal tool open-sourced in the spirit of sharing. Contributions are welcome but scope is intentionally narrow — this app does one thing: read HealthKit data and show AI analysis. PRs that add significant complexity will likely be declined.
+Scope is intentionally narrow — this app reads HealthKit data and shows AI analysis. PRs that add significant complexity will likely be declined.
 
 ## What's welcome
 
@@ -15,7 +15,7 @@ This is a personal tool open-sourced in the spirit of sharing. Contributions are
 ## Setup
 
 1. Clone the repo
-2. Open `HealthLens.xcodeproj` in Xcode
+2. Open `Meridian.xcodeproj` in Xcode
 3. Set your own Bundle ID and Team under **Signing & Capabilities**
 4. Add your API key in **Settings → AI Analysis** after first launch
 
