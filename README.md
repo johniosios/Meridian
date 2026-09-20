@@ -1,6 +1,6 @@
 # Meridian
 
-Private, on-device AI analysis of your Apple Watch data. No backend, no account, no data leaving your iCloud.
+Private, on-device AI analysis of your Apple Health data. No backend, no account, no data leaving your iCloud.
 
 <div align="center">
   <img src="assets/icon.png" width="160" alt="Meridian" />
